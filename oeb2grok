@@ -1,0 +1,291 @@
+local UserInputService = game:GetService("UserInputService")
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local Debris = game:GetService("Debris")
+
+-- Get the local player
+local player = Players.LocalPlayer
+local character = player.Character
+local humanoid
+local rootPart
+
+-- Wait for character to load
+local function waitForCharacter()
+	if not character or not character.Parent then
+		character = player.CharacterAdded:Wait()
+	end
+	humanoid = character:WaitForChild("Humanoid", 10)
+	rootPart = character:WaitForChild("HumanoidRootPart", 10)
+	if not humanoid or not rootPart then
+		local errorLabel = Instance.new("TextLabel")
+		errorLabel.Size = UDim2.new(0, 200, 0, 20)
+		errorLabel.Position = UDim2.new(0.5, -100, 0.5, -10)
+		errorLabel.BackgroundTransparency = 1
+		errorLabel.Text = "Error: Character not loaded!"
+		errorLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
+		errorLabel.TextSize = 14
+		errorLabel.ZIndex = 1000
+		errorLabel.Parent = player.PlayerGui
+		Debris:AddItem(errorLabel, 3)
+		return false
+	end
+	return true
+end
+
+-- Initialize with delay
+wait(5) -- Wait for game to load
+if not waitForCharacter() then return end
+
+-- Sky-walking variables
+local isInSky = false
+local originalPosition
+local skyPlatform
+
+-- Create ScreenGui
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "oeb2_private"
+screenGui.Parent = player.PlayerGui
+screenGui.ResetOnSpawn = false
+screenGui.IgnoreGuiInset = true
+screenGui.Enabled = true
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+screenGui.ZIndex = 1000
+screenGui.DisplayOrder = 1000
+
+-- Create Key Input Frame
+local keyFrame = Instance.new("Frame")
+keyFrame.Size = UDim2.new(0, 200, 0, 150)
+keyFrame.Position = UDim2.new(0.5, -100, 0.5, -75)
+keyFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+keyFrame.BackgroundTransparency = 0.2
+keyFrame.BorderColor3 = Color3.fromRGB(128, 0, 128)
+keyFrame.BorderSizePixel = 2
+keyFrame.ZIndex = 1000
+keyFrame.Parent = screenGui
+
+-- Create Key Input Label
+local keyLabel = Instance.new("TextLabel")
+keyLabel.Size = UDim2.new(0, 180, 0, 30)
+keyLabel.Position = UDim2.new(0, 10, 0, 10)
+keyLabel.BackgroundTransparency = 1
+keyLabel.Text = "Enter Key:"
+keyLabel.TextColor3 = Color3.fromRGB(128, 0, 128)
+keyLabel.TextSize = 14
+keyLabel.ZIndex = 1000
+keyLabel.Parent = keyFrame
+
+-- Create Key Input TextBox
+local keyInput = Instance.new("TextBox")
+keyInput.Size = UDim2.new(0, 180, 0, 40)
+keyInput.Position = UDim2.new(0, 10, 0, 50)
+keyInput.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+keyInput.BorderColor3 = Color3.fromRGB(128, 0, 128)
+keyInput.Text = ""
+keyInput.PlaceholderText = "Type key here..."
+keyInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+keyInput.TextSize = 14
+keyInput.ZIndex = 1000
+keyInput.Parent = keyFrame
+
+-- Create Submit Button
+local submitButton = Instance.new("TextButton")
+submitButton.Size = UDim2.new(0, 180, 0, 40)
+submitButton.Position = UDim2.new(0, 10, 0, 100)
+submitButton.BackgroundColor3 = Color3.fromRGB(128, 0, 128)
+submitButton.Text = "Submit"
+submitButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+submitButton.TextSize = 14
+submitButton.ZIndex = 1000
+submitButton.Parent = keyFrame
+
+-- Create Main Frame
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 200, 0, 150)
+mainFrame.Position = UDim2.new(0.5, -100, 0.5, -75)
+mainFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+mainFrame.BackgroundTransparency = 0.2
+mainFrame.BorderColor3 = Color3.fromRGB(128, 0, 128)
+mainFrame.BorderSizePixel = 2
+mainFrame.ZIndex = 1000
+mainFrame.Visible = false
+mainFrame.Parent = screenGui
+
+-- Create Sky Walk Button
+local skyWalkButton = Instance.new("TextButton")
+skyWalkButton.Size = UDim2.new(0, 180, 0, 40)
+skyWalkButton.Position = UDim2.new(0, 10, 0, 10)
+skyWalkButton.BackgroundColor3 = Color3.fromRGB(128, 0, 128)
+skyWalkButton.Text = "Sky Walk"
+skyWalkButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+skyWalkButton.TextSize = 14
+skyWalkButton.ZIndex = 1000
+skyWalkButton.Parent = mainFrame
+
+-- Create Down Button
+local downButton = Instance.new("TextButton")
+downButton.Size = UDim2.new(0, 180, 0, 40)
+downButton.Position = UDim2.new(0, 10, 0, 60)
+downButton.BackgroundColor3 = Color3.fromRGB(128, 0, 128)
+downButton.Text = "Down (Return to Ground)"
+downButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+downButton.TextSize = 14
+downButton.ZIndex = 1000
+downButton.Parent = mainFrame
+
+-- Create Teleport to Base Button
+local teleportBaseButton = Instance.new("TextButton")
+teleportBaseButton.Size = UDim2.new(0, 180, 0, 40)
+teleportBaseButton.Position = UDim2.new(0, 10, 0, 110)
+teleportBaseButton.BackgroundColor3 = Color3.fromRGB(128, 0, 128)
+teleportBaseButton.Text = "Teleport to Base"
+teleportBaseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+teleportBaseButton.TextSize = 14
+teleportBaseButton.ZIndex = 1000
+teleportBaseButton.Parent = mainFrame
+
+-- Function to show notification
+local function showNotification(message, color)
+	local notification = Instance.new("TextLabel")
+	notification.Size = UDim2.new(0, 200, 0, 20)
+	notification.Position = UDim2.new(0.5, -100, 0.5, -95)
+	notification.BackgroundTransparency = 1
+	notification.Text = message
+	notification.TextColor3 = color or Color3.fromRGB(255, 0, 0)
+	notification.TextSize = 14
+	notification.ZIndex = 1000
+	notification.Parent = screenGui
+	Debris:AddItem(notification, 3)
+end
+
+-- Key validation
+local correctKey = "mango"
+submitButton.MouseButton1Click:Connect(function()
+	if keyInput.Text == correctKey then
+		keyFrame.Visible = false
+		mainFrame.Visible = true
+		showNotification("Access granted!", Color3.fromRGB(0, 255, 0))
+	else
+		keyInput.Text = ""
+		keyInput.PlaceholderText = "Invalid Key!"
+		wait(1)
+		keyInput.PlaceholderText = "Type key here..."
+		showNotification("Invalid key!", Color3.fromRGB(255, 0, 0))
+	end
+end)
+
+-- Sky Walk button functionality
+skyWalkButton.MouseButton1Click:Connect(function()
+	if not character or not rootPart then
+		showNotification("Error: Character not loaded!")
+		return
+	end
+	if not isInSky then
+		isInSky = true
+		originalPosition = rootPart.Position
+		local skyPosition = originalPosition + Vector3.new(0, 50, 0)
+		rootPart.CFrame = CFrame.new(skyPosition)
+		skyPlatform = Instance.new("Part")
+		skyPlatform.Size = Vector3.new(10, 0.2, 10)
+		skyPlatform.Position = skyPosition - Vector3.new(0, 2, 0)
+		skyPlatform.Anchored = true
+		skyPlatform.Transparency = 1
+		skyPlatform.CanCollide = true
+		skyPlatform.Parent = game.Workspace
+		showNotification("Sky Walk activated!", Color3.fromRGB(0, 255, 0))
+	end
+end)
+
+-- Down button functionality
+downButton.MouseButton1Click:Connect(function()
+	if not character or not rootPart then
+		showNotification("Error: Character not loaded!")
+		return
+	end
+	if isInSky then
+		isInSky = false
+		rootPart.CFrame = CFrame.new(originalPosition)
+		if skyPlatform then
+			skyPlatform:Destroy()
+			skyPlatform = nil
+		end
+		showNotification("Returned to ground!", Color3.fromRGB(0, 255, 0))
+	end
+end)
+
+-- Teleport to Base button functionality
+teleportBaseButton.MouseButton1Click:Connect(function()
+	if not character or not rootPart then
+		showNotification("Error: Character not loaded!")
+		return
+	end
+	local base = nil
+	if game.Workspace:FindFirstChild("Plots") then
+		for _, plot in pairs(game.Workspace.Plots:GetChildren()) do
+			local yourBase = plot:FindFirstChild("YourBase", true)
+			if yourBase and yourBase:IsA("BoolValue") and yourBase.Enabled then
+				base = plot:FindFirstChild("DeliveryHitbox", true)
+				if base then break end
+			end
+		end
+	end
+	if not base then
+		for _, part in pairs(game.Workspace:GetDescendants()) do
+			if part.Name == "DeliveryHitbox" and part:IsA("BasePart") then
+				local plot = part:FindFirstAncestorOfClass("Model")
+				if plot and plot:FindFirstChild("YourBase", true) and plot:FindFirstChild("YourBase", true).Enabled then
+					base = part
+					break
+				end
+			end
+		end
+	end
+	if base then
+		local plrPos = rootPart.Position
+		local tpPos = base.Position + Vector3.new(0, 5, 0)
+		local tweenInfo = TweenInfo.new(
+			math.min((tpPos - plrPos).Magnitude / humanoid.WalkSpeed, 2),
+			Enum.EasingStyle.Linear,
+			Enum.EasingDirection.Out
+		)
+		TweenService:Create(rootPart, tweenInfo, {CFrame = CFrame.new(tpPos), Velocity = Vector3.new(0, 0, 0)}):Play()
+		if isInSky then
+			isInSky = false
+			if skyPlatform then
+				skyPlatform:Destroy()
+				skyPlatform = nil
+			end
+		end
+		showNotification("Teleported to base!", Color3.fromRGB(0, 255, 0))
+	else
+		showNotification("Base not found! Check workspace.Plots.")
+	end
+end)
+
+-- Update character on respawn
+player.CharacterAdded:Connect(function(newCharacter)
+	character = newCharacter
+	humanoid = character:WaitForChild("Humanoid", 10)
+	rootPart = character:WaitForChild("HumanoidRootPart", 10)
+	if not humanoid or not rootPart then
+		showNotification("Error: Character not loaded on respawn!")
+		return
+	end
+	if isInSky then
+		local skyPosition = originalPosition + Vector3.new(0, 50, 0)
+		rootPart.CFrame = CFrame.new(skyPosition)
+		if skyPlatform then
+			skyPlatform:Destroy()
+		end
+		skyPlatform = Instance.new("Part")
+		skyPlatform.Size = Vector3.new(10, 0.2, 10)
+		skyPlatform.Position = skyPosition - Vector3.new(0, 2, 0)
+		skyPlatform.Anchored = true
+		skyPlatform.Transparency = 1
+		skyPlatform.CanCollide = true
+		skyPlatform.Parent = game.Workspace
+	end
+end)
+
+-- Debug: Confirm script loaded
+showNotification("Script loaded! Enter key.", Color3.fromRGB(0, 255, 0))
+print("oeb2_private_revised.lua: Script executed!")
